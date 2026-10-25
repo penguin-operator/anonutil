@@ -1,8 +1,4 @@
-all: proxy.json bin/proxyscrape bin/vpngate
-
-proxy.json: bin/proxyscrape
-	touch proxy.json
-	./bin/proxyscrape proxy.json
+all: bin/proxyscrape bin/vpngate
 
 bin/%: %/main.go
 	mkdir -p bin

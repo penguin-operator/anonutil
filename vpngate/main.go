@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,13 +60,16 @@ func GetVPN(config string) (proto string, ip string, port string) {
 
 func GetIPGeo(ip string) (country, region, city string, err error) {
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 60 * time.Second,
 	}
 	resp, err := client.Get(IP_API + ip)
-	if err != nil { return }
+	for err != nil || resp.StatusCode != http.StatusOK {
+		time.Sleep(60 * time.Second)
+		resp, err = client.Get(IP_API + ip)
+	}
 	defer resp.Body.Close()
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
+	if err = json.NewDecoder(resp.Body).Decode(&body); err != nil { return }
 	if body["country"] == nil || body["region"] == nil || body["city"] == nil {
 		err = errors.New("malformed body")
 		return
@@ -76,7 +80,7 @@ func GetIPGeo(ip string) (country, region, city string, err error) {
 	return
 }
 
-func ProcessVPN(config []byte, format string) {
+func ProcessVPN(config []byte, format string) (err error) {
 	proto, ip, port := GetVPN(string(config))
 	country, region, city, err := GetIPGeo(ip)
 	if err != nil { return }
@@ -91,6 +95,7 @@ func ProcessVPN(config []byte, format string) {
 		os.Mkdir(strings.Join(path[:i+1], "/"), 0755)
 	}
 	os.WriteFile(format, config, 0644)
+	return
 }
 
 func main() {
@@ -134,11 +139,15 @@ func main() {
 	if err != nil { panic(err) }
 	fmt.Print("decoding servers configs ... ")
 	var wg sync.WaitGroup
+	var n int
 	for _, vpn := range vpns[1:] {
 		wg.Go(func () {
 			config, err := base64.StdEncoding.DecodeString(vpn[14])
 			if err != nil { panic(err) }
-			ProcessVPN(config, format)
+			if err = ProcessVPN(config, format); err == nil {
+				n += 1
+				fmt.Print("\rdecoding servers configs (", strconv.Itoa(n), ") ... ")
+			}
 		})
 	}
 	wg.Wait()

@@ -52,10 +52,11 @@ func main() {
 		panic("no output file specified")
 	}
 	file := args[0]
-	input, err := os.ReadFile(file)
-	if err != nil { panic(err) }
 	var proxies []proxyspeed.Proxy
-	json.Unmarshal(input, &proxies)
+	input, err := os.ReadFile(file)
+	if err == nil {
+		json.Unmarshal(input, &proxies)
+	}
 	var purl []string
 	for _, p := range proxies {
 		purl = append(purl, p.Proxy)
